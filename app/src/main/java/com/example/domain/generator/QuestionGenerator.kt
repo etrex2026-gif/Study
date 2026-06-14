@@ -11,10 +11,10 @@ class QuestionGenerator {
         types: List<String>,
         questionCountPerType: Int
     ): List<QuestionEntity> {
-        // Split content into sentences focusing on those likely to contain facts
+        // Split content into sentences and filter for fact-dense ones
         val sentences = content.split(Regex("(?<=[.!?])\\s+"))
             .map { it.trim() }
-            .filter { it.length in 40..300 } 
+            .filter { it.length in 40..400 } 
             .distinct()
             .shuffled()
 
@@ -36,8 +36,8 @@ class QuestionGenerator {
 
                 if (question != null) {
                     val difficulty = when {
-                        sentence.length > 200 -> "Hard"
-                        sentence.length > 120 -> "Medium"
+                        sentence.length > 250 || sentence.contains(Regex("(however|consequently|whereas|nevertheless)", RegexOption.IGNORE_CASE)) -> "Hard"
+                        sentence.length > 130 || sentence.contains(Regex("(because|since|therefore|resulting)", RegexOption.IGNORE_CASE)) -> "Medium"
                         else -> "Easy"
                     }
                     questions.add(question.copy(difficulty = difficulty))

@@ -15,6 +15,9 @@ interface QuizDao {
     @Query("SELECT * FROM units WHERE documentId = :documentId ORDER BY orderIndex ASC")
     fun getUnitsForDocument(documentId: Long): Flow<List<UnitEntity>>
 
+    @Query("SELECT * FROM units WHERE documentId = :documentId ORDER BY orderIndex ASC")
+    suspend fun getUnitsForDocumentSync(documentId: Long): List<UnitEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertUnits(units: List<UnitEntity>)
 

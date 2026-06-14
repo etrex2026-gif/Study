@@ -82,8 +82,8 @@ class MainActivity : ComponentActivity() {
             val unitIds = unitIdsStr.split(",").map { it.toLong() }
             
             QuizConfigScreen(
-              onStartQuiz = { types, count, isExam ->
-                viewModel.generateQuiz(unitIds, types, count)
+              onStartQuiz = { types, count, isExam, difficulty ->
+                viewModel.generateQuiz(unitIds, types, count, difficulty)
                 navController.navigate("quiz/$docId/$isExam")
               },
               onBack = { navController.popBackStack() }

@@ -69,8 +69,9 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
     fun importText(title: String, text: String, onComplete: (Long) -> Unit) {
         viewModelScope.launch {
             _isAnalyzing.value = true
-            simulateProgress()
             val id = repository.addDocumentFromText(title, text)
+            val units = db.quizDao().getUnitsForDocumentSync(id)
+            syncPhasedAnalysis(units)
             _isAnalyzing.value = false
             onComplete(id)
         }
@@ -79,50 +80,82 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
     fun importUri(uri: android.net.Uri, title: String, onComplete: (Long) -> Unit) {
         viewModelScope.launch {
             _isAnalyzing.value = true
-            simulateProgress()
             val id = repository.addDocumentFromUri(uri, title)
+            val units = db.quizDao().getUnitsForDocumentSync(id)
+            syncPhasedAnalysis(units)
             _isAnalyzing.value = false
             onComplete(id)
         }
     }
 
-    private suspend fun simulateProgress() {
-        val steps = listOf(
-            0.1f to "Extracting text...",
+    private suspend fun syncPhasedAnalysis(units: List<UnitEntity>) {
+        val generator = QuestionGenerator()
+        val types = listOf("MCQ", "TRUE_FALSE", "FILL_BLANKS")
+        
+        val progressStages = listOf(
+            0.1f to "Reading document...",
+            0.2f to "Extracting text...",
             0.3f to "Detecting structure...",
+            0.4f to "Identifying chapters...",
             0.5f to "Identifying topics...",
-            0.7f to "Extracting key facts...",
-            0.9f to "Generating question bank...",
-            1.0f to "Finalizing database..."
+            0.6f to "Identifying subtopics...",
+            0.7f to "Extracting facts and concepts...",
+            0.8f to "Building knowledge map..."
         )
-        for (step in steps) {
-            _analysisProgress.value = step.first
-            delay(500) // Simulate processing time
+        
+        for (stage in progressStages) {
+            _analysisProgress.value = stage.first
+            delay(400)
         }
+
+        _analysisProgress.value = 0.9f
+        // Phase 5: Question Bank Generation
+        val bulkBank = mutableListOf<QuestionEntity>()
+        units.forEach { unit ->
+            bulkBank.addAll(generator.generate(unit.id, unit.content, types, 10)) // 30 questions per unit bank
+        }
+        
+        _analysisProgress.value = 0.95f
+        // Finalize
+        db.quizDao().insertQuestions(bulkBank)
+        _analysisProgress.value = 1.0f
+        delay(500)
     }
 
-    fun generateQuiz(unitIds: List<Long>, types: List<String>, countPerType: Int) {
+    private suspend fun simulateProgress() {
+        // Not used anymore as we have syncPhasedAnalysis
+    }
+
+    fun generateQuiz(unitIds: List<Long>, types: List<String>, countPerType: Int, difficulty: String? = null) {
         viewModelScope.launch {
-            val generator = QuestionGenerator()
             val existingQuestions = repository.getQuestionsForUnits(unitIds)
             
-            val filteredExisting = existingQuestions.filter { types.contains(it.type) }
+            // Filter by type and optionally difficulty
+            val filteredQuestions = existingQuestions.filter { 
+                types.contains(it.type) && (difficulty == null || it.difficulty == difficulty)
+            }
             
-            // If we have enough stored questions, use them
-            if (filteredExisting.size >= (types.size * countPerType)) {
-                _generatedQuestions.value = filteredExisting.shuffled().take(types.size * countPerType)
+            // Total questions requested: types.size * countPerType
+            val targetTotal = types.size * countPerType
+            
+            if (filteredQuestions.size >= targetTotal) {
+                _generatedQuestions.value = filteredQuestions.shuffled().take(targetTotal)
             } else {
-                // Generate and save more
-                val questions = mutableListOf<QuestionEntity>()
+                // If not enough of specific difficulty or types exist, generate more on demand
+                val generator = QuestionGenerator()
+                val additional = mutableListOf<QuestionEntity>()
                 val unitsToProcess = _currentUnits.value.filter { it.id in unitIds }
                 
                 for (unit in unitsToProcess) {
-                    questions.addAll(generator.generate(unit.id, unit.content, types, countPerType))
+                    additional.addAll(generator.generate(unit.id, unit.content, types, countPerType))
                 }
                 
-                // Save to DB for future offline-instancy
-                db.quizDao().insertQuestions(questions)
-                _generatedQuestions.value = questions.shuffled()
+                db.quizDao().insertQuestions(additional)
+                // Filter the merged set
+                val finalPool = (filteredQuestions + additional).filter { 
+                    types.contains(it.type) && (difficulty == null || it.difficulty == difficulty)
+                }
+                _generatedQuestions.value = finalPool.shuffled().take(targetTotal.coerceAtMost(finalPool.size))
             }
         }
     }

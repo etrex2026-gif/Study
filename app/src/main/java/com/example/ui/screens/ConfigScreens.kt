@@ -112,12 +112,13 @@ fun UnitSelectionScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun QuizConfigScreen(
-    onStartQuiz: (List<String>, Int, Boolean) -> Unit,
+    onStartQuiz: (List<String>, Int, Boolean, String?) -> Unit,
     onBack: () -> Unit
 ) {
     var countPerType by remember { mutableFloatStateOf(5f) }
     val selectedTypes = remember { mutableStateListOf("MCQ", "TRUE_FALSE") }
     var isExamMode by remember { mutableStateOf(false) }
+    var selectedDifficulty by remember { mutableStateOf<String?>(null) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -203,10 +204,22 @@ fun QuizConfigScreen(
                 steps = 14
             )
 
+            Text("DIFFICULTY FILTER", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("All", "Easy", "Medium", "Hard").forEach { level ->
+                    val isLevelSelected = (selectedDifficulty == null && level == "All") || (selectedDifficulty == level)
+                    FilterChip(
+                        selected = isLevelSelected,
+                        onClick = { selectedDifficulty = if (level == "All") null else level },
+                        label = { Text(level) }
+                    )
+                }
+            }
+
             Spacer(Modifier.weight(1f))
 
             Button(
-                onClick = { onStartQuiz(selectedTypes.toList(), countPerType.toInt(), isExamMode) },
+                onClick = { onStartQuiz(selectedTypes.toList(), countPerType.toInt(), isExamMode, selectedDifficulty) },
                 modifier = Modifier.fillMaxWidth().height(56.dp).shadow(8.dp, CircleShape),
                 shape = CircleShape,
                 enabled = selectedTypes.isNotEmpty()
