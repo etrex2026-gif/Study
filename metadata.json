@@ -1,0 +1,6 @@
+{
+  "name": "StudyGen",
+  "description": "Offline intelligent study quiz generator that transforms books and text into interactive quizzes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
